@@ -1,44 +1,72 @@
 // ========================================
-// PAPER GENERATOR AI API
+// PROFESSIONAL PAPER GENERATOR
+// GEMINI API CONNECTION
 // ========================================
 
 const AI_CONFIG = {
-    API_URL: "YOUR_API_URL_HERE",
-    API_KEY: "YOUR_API_KEY_HERE",
-    MODEL: "YOUR_MODEL_HERE"
+    API_URL:
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+
+    MODEL: "gemini-3.8-flash"
 };
 
-async function generatePaperWithAI(data) {
+
+// ========================================
+// GENERATE PAPER WITH GEMINI
+// ========================================
+
+async function generatePaperWithAI(data, apiKey) {
+
+    if (!apiKey) {
+        throw new Error("Gemini API key is required.");
+    }
 
     const prompt = `
 You are a professional school examination paper generator.
 
-Create an examination paper using ONLY the content provided by the user.
+Create an examination paper using ONLY the lesson/content provided below.
 
-Class: ${data.className}
-Subject: ${data.subject}
-Language: ${data.language}
-Difficulty: ${data.difficulty}
+CLASS:
+${data.className || ""}
 
-MCQs: ${data.mcqCount}
-Short Questions: ${data.shortCount}
-Long Questions: ${data.longCount}
+SUBJECT:
+${data.subject || ""}
 
-Total Marks: ${data.totalMarks}
-Passing Marks: ${data.passingMarks}
+LANGUAGE:
+${data.language || "English"}
 
-Requirements:
-- Create clear examination-quality questions.
-- Include conceptual questions.
-- Include analytical questions where appropriate.
-- Include application-based questions where appropriate.
-- Follow the requested difficulty.
-- Do NOT add information that is not supported by the supplied content.
-- Do NOT repeat questions unnecessarily.
-- Return the answer key separately.
+DIFFICULTY:
+${data.difficulty || "Normal"}
+
+MCQs:
+${data.mcqCount || 0}
+
+SHORT QUESTIONS:
+${data.shortCount || 0}
+
+LONG QUESTIONS:
+${data.longCount || 0}
+
+TOTAL MARKS:
+${data.totalMarks || 0}
+
+PASSING MARKS:
+${data.passingMarks || 0}
+
+RULES:
+1. Use only the supplied lesson/content.
+2. Do not introduce unrelated facts.
+3. Follow the selected class and subject.
+4. Follow the selected difficulty.
+5. Create clear examination-quality questions.
+6. Avoid unnecessary repetition.
+7. Create conceptual and analytical questions where appropriate.
+8. Create application-based questions where appropriate.
+9. Keep the requested number of questions.
+10. Provide a separate answer key.
 
 SOURCE CONTENT:
-${data.lessonContent}
+${data.lessonContent || ""}
 `;
 
     const response = await fetch(AI_CONFIG.API_URL, {
@@ -46,29 +74,67 @@ ${data.lessonContent}
 
         headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${AI_CONFIG.API_KEY}`
+            "x-goog-api-key": apiKey
         },
 
         body: JSON.stringify({
-            model: AI_CONFIG.MODEL,
-
-            messages: [
+            contents: [
                 {
-                    role: "system",
-                    content:
-                        "You are a professional school examination paper generator."
-                },
-                {
-                    role: "user",
-                    content: prompt
+                    parts: [
+                        {
+                            text: prompt
+                        }
+                    ]
                 }
             ]
         })
     });
 
     if (!response.ok) {
-        throw new Error("AI API Error: " + response.status);
+        const error = await response.text();
+        throw new Error(
+            "Gemini API Error " +
+            response.status +
+            ": " +
+            error
+        );
     }
 
-    return await response.json();
+    const result = await response.json();
+
+    const text =
+        result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) {
+        throw new Error("Gemini نے کوئی جواب واپس نہیں کیا۔");
+    }
+
+    return text;
+}
+
+
+// ========================================
+// SIMPLE API TEST
+// ========================================
+
+async function testGeminiAPI(apiKey) {
+
+    return await generatePaperWithAI(
+        {
+            className: "9th",
+            subject: "Science",
+            language: "English",
+            difficulty: "Normal",
+            mcqCount: 2,
+            shortCount: 2,
+            longCount: 1,
+            totalMarks: 10,
+            passingMarks: 4,
+
+            lessonContent:
+                "Plants make food through photosynthesis. " +
+                "Chlorophyll helps plants absorb light energy."
+        },
+        apiKey
+    );
 }
